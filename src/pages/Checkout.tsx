@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Crown, Star, Flame, Skull, Sparkles, Gem, Check, Zap, Shield, Clock, ChevronDown, Package, Gift, Key, Upload, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Crown, Star, Flame, Skull, Sparkles, Gem, Check, Zap, Shield, Clock, ChevronDown, Package, Gift, Key, Upload, Loader2, CheckCircle, Coins, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ import paymentQR from "@/assets/payment-qr.png";
 
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1459835220290441345/25r77rdGny-cj81NCY1ivV5l8C5Z78f9MswpNtg6l9peOEpr-EF55Is7cmTiAAEUfFht";
 
-type ProductType = "rank" | "key";
+type ProductType = "rank" | "key" | "currency";
 
 interface RankProduct {
   type: "rank";
@@ -44,7 +44,17 @@ interface KeyProduct {
   qrLink: string;
 }
 
-type Product = RankProduct | KeyProduct;
+interface CurrencyProduct {
+  type: "currency";
+  name: string;
+  description: string;
+  ratePerUnit: number; // Rs per 1 unit
+  unit: string;
+  minQuantity: number;
+  qrLink: string;
+}
+
+type Product = RankProduct | KeyProduct | CurrencyProduct;
 
 const products: Record<string, Product> = {
   // Ranks - ordered by price (ascending)
@@ -233,6 +243,25 @@ const products: Record<string, Product> = {
     rewards: ["Notch Apple (64)", "Spawner x3 (20-30)", "Gold Coin", "Netherite Helmet", "Netherite Chestplate", "Netherite Leggings", "Netherite Boots", "Mace", "Netherite Sword", "Netherite Axe", "Netherite Pickaxe", "Netherite Hoe", "Netherite Shovel", "Feather", "Fishing Rod"],
     qrLink: "https://spicysmp.dpdns.org/purple_key.html",
   },
+  // Currency products
+  coins: {
+    type: "currency",
+    name: "In-Game Coins",
+    description: "Buy coins to use in the server economy. Trade, purchase items from shops, and more!",
+    ratePerUnit: 2, // ₹2 = 1 coin
+    unit: "coins",
+    minQuantity: 100,
+    qrLink: "https://spicysmp.dpdns.org/coins.html",
+  },
+  claimblocks: {
+    type: "currency",
+    name: "Claim Blocks",
+    description: "Protect your builds! Claim blocks let you expand your protected territory on the server.",
+    ratePerUnit: 1, // ₹1 = 1 claim block
+    unit: "blocks",
+    minQuantity: 100,
+    qrLink: "https://spicysmp.dpdns.org/claimblocks.html",
+  },
 };
 
 const tierConfig: Record<string, { icon: typeof Star; gradient: string; bgGradient: string; glow: string; accent: string }> = {
@@ -299,6 +328,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const [selectedDuration, setSelectedDuration] = useState(0);
   const [keyQuantity, setKeyQuantity] = useState(1);
+  const [currencyQuantity, setCurrencyQuantity] = useState(100);
   const [showKitItems, setShowKitItems] = useState(false);
   
   // Form states
@@ -314,10 +344,17 @@ const Checkout = () => {
   const product = productId ? products[productId] : null;
   
   const isCustomRank = product?.type === "rank" && (product as RankProduct).isCustomRank;
+  const isCurrency = product?.type === "currency";
+  const isRank = product?.type === "rank";
+  const isKey = product?.type === "key";
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    // Set initial currency quantity based on min quantity
+    if (product?.type === "currency") {
+      setCurrencyQuantity((product as CurrencyProduct).minQuantity);
+    }
+  }, [product]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -355,14 +392,28 @@ const Checkout = () => {
       const formData = new FormData();
       
       const isRankProduct = product?.type === "rank";
-      const basePrice = isRankProduct 
-        ? (product as RankProduct).durations[selectedDuration].price 
-        : (product as KeyProduct).price;
-      const price = isRankProduct ? basePrice : basePrice * keyQuantity;
-      const duration = isRankProduct 
-        ? `${(product as RankProduct).durations[selectedDuration].days} Days` 
-        : "N/A";
-      const quantity = isRankProduct ? 1 : keyQuantity;
+      const isCurrencyProduct = product?.type === "currency";
+      const isKeyProduct = product?.type === "key";
+      
+      let price = 0;
+      let quantity: number | string = 1;
+      let duration = "N/A";
+      
+      if (isRankProduct) {
+        price = (product as RankProduct).durations[selectedDuration].price;
+        duration = `${(product as RankProduct).durations[selectedDuration].days} Days`;
+      } else if (isKeyProduct) {
+        price = (product as KeyProduct).price * keyQuantity;
+        quantity = keyQuantity;
+      } else if (isCurrencyProduct) {
+        price = currencyQuantity * (product as CurrencyProduct).ratePerUnit;
+        quantity = `${currencyQuantity} ${(product as CurrencyProduct).unit}`;
+      }
+      
+      // Apply discount if active
+      if (isDiscountActive) {
+        price = Math.round(price * 0.9);
+      }
 
       const embedFields = [
         { name: "📦 Product", value: product?.name || "Unknown", inline: true },
@@ -430,23 +481,46 @@ const Checkout = () => {
     );
   }
 
-  const isRank = product.type === "rank";
-  const config = isRank ? tierConfig[(product as RankProduct).tier] : null;
-  const Icon = config?.icon || Key;
-  const gradient = config?.gradient || (product as KeyProduct).isFree ? "from-accent to-cyan-400" : "from-secondary to-amber-400";
-  const bgGradient = config?.bgGradient || (product as KeyProduct).isFree ? "from-accent/20 to-cyan-400/20" : "from-secondary/20 to-amber-400/20";
-  const glow = config?.glow || (product as KeyProduct).isFree ? "0 0 80px hsla(185, 100%, 50%, 0.3)" : "0 0 80px hsla(45, 100%, 50%, 0.3)";
-  const accent = config?.accent || (product as KeyProduct).isFree ? "text-accent" : "text-secondary";
+  // Currency-specific config
+  const currencyConfig: Record<string, { icon: typeof Coins; gradient: string; bgGradient: string; glow: string; accent: string }> = {
+    coins: {
+      icon: Coins,
+      gradient: "from-yellow-500 to-amber-600",
+      bgGradient: "from-yellow-500/20 to-amber-600/20",
+      glow: "0 0 60px hsla(45, 100%, 50%, 0.4)",
+      accent: "text-yellow-400",
+    },
+    claimblocks: {
+      icon: MapPin,
+      gradient: "from-green-500 to-emerald-600",
+      bgGradient: "from-green-500/20 to-emerald-600/20",
+      glow: "0 0 60px hsla(140, 100%, 50%, 0.4)",
+      accent: "text-green-400",
+    },
+  };
+
+  const config = isRank ? tierConfig[(product as RankProduct).tier] : isCurrency && productId ? currencyConfig[productId] : null;
+  const Icon = config?.icon || (isCurrency ? (productId === "coins" ? Coins : MapPin) : Key);
+  const gradient = config?.gradient || (isKey && (product as KeyProduct).isFree ? "from-accent to-cyan-400" : "from-secondary to-amber-400");
+  const bgGradient = config?.bgGradient || (isKey && (product as KeyProduct).isFree ? "from-accent/20 to-cyan-400/20" : "from-secondary/20 to-amber-400/20");
+  const glow = config?.glow || (isKey && (product as KeyProduct).isFree ? "0 0 80px hsla(185, 100%, 50%, 0.3)" : "0 0 80px hsla(45, 100%, 50%, 0.3)");
+  const accent = config?.accent || (isKey && (product as KeyProduct).isFree ? "text-accent" : "text-secondary");
 
   // Discount configuration - 10% off until Jan 20, 2026
   const discountEndDate = new Date('2026-01-20T23:59:59');
   const isDiscountActive = new Date() <= discountEndDate;
   const discountPercent = 10;
 
-  const basePrice = isRank 
-    ? (product as RankProduct).durations[selectedDuration].price 
-    : (product as KeyProduct).price;
-  const originalPrice = isRank ? basePrice : basePrice * keyQuantity;
+  // Calculate prices based on product type
+  let originalPrice = 0;
+  if (isRank) {
+    originalPrice = (product as RankProduct).durations[selectedDuration].price;
+  } else if (isKey) {
+    originalPrice = (product as KeyProduct).price * keyQuantity;
+  } else if (isCurrency) {
+    originalPrice = currencyQuantity * (product as CurrencyProduct).ratePerUnit;
+  }
+  
   const discountedPrice = isDiscountActive ? Math.round(originalPrice * (1 - discountPercent / 100)) : originalPrice;
   const currentPrice = discountedPrice;
 
@@ -500,12 +574,21 @@ const Checkout = () => {
                 className="relative rounded-2xl overflow-hidden mb-6"
                 style={{ boxShadow: glow }}
               >
-                {isRank ? (
+              {isRank ? (
                   <img
                     src={(product as RankProduct).image}
                     alt={product.name}
                     className="w-full aspect-video object-cover"
                   />
+                ) : isCurrency ? (
+                  <div className={`w-full aspect-video bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                    <motion.div
+                      animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                    >
+                      <Icon className="w-24 h-24 text-white" />
+                    </motion.div>
+                  </div>
                 ) : (
                   <div className={`w-full aspect-video bg-gradient-to-br ${gradient} flex items-center justify-center`}>
                     <motion.div
@@ -526,7 +609,7 @@ const Checkout = () => {
                 <div className={`absolute top-4 left-4 px-4 py-2 rounded-full bg-gradient-to-r ${gradient} flex items-center gap-2`}>
                   <Icon className="w-4 h-4 text-white" />
                   <span className="text-sm font-display font-bold text-white">
-                    {isRank ? (product as RankProduct).tier.toUpperCase() : (product as KeyProduct).isFree ? "FREE" : "PREMIUM"}
+                    {isRank ? (product as RankProduct).tier.toUpperCase() : isCurrency ? "CURRENCY" : (product as KeyProduct).isFree ? "FREE" : "PREMIUM"}
                   </span>
                 </div>
               </div>
@@ -537,26 +620,67 @@ const Checkout = () => {
               </h1>
               <p className="text-muted-foreground mb-6">{product.description}</p>
 
-              {/* Perks/Rewards */}
-              <div className="space-y-3 mb-6">
-                <h3 className="font-display text-sm uppercase tracking-wider text-muted-foreground">
-                  {isRank ? "Perks Included" : "Possible Rewards"}
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {(isRank ? (product as RankProduct).perks : (product as KeyProduct).rewards).map((item, index) => (
+              {/* Perks/Rewards - Only show for ranks and keys */}
+              {(isRank || isKey) && (
+                <div className="space-y-3 mb-6">
+                  <h3 className="font-display text-sm uppercase tracking-wider text-muted-foreground">
+                    {isRank ? "Perks Included" : "Possible Rewards"}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(isRank ? (product as RankProduct).perks : (product as KeyProduct).rewards).map((item, index) => (
+                      <motion.div
+                        key={item}
+                        className="flex items-center gap-2 p-3 rounded-lg glass border border-border/50"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Check className={`w-4 h-4 ${accent} flex-shrink-0`} />
+                        <span className="text-sm text-foreground">{item}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Currency info */}
+              {isCurrency && (
+                <div className="space-y-3 mb-6">
+                  <h3 className="font-display text-sm uppercase tracking-wider text-muted-foreground">
+                    What You Get
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
                     <motion.div
-                      key={item}
                       className="flex items-center gap-2 p-3 rounded-lg glass border border-border/50"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
                     >
                       <Check className={`w-4 h-4 ${accent} flex-shrink-0`} />
-                      <span className="text-sm text-foreground">{item}</span>
+                      <span className="text-sm text-foreground">
+                        Rate: ₹{(product as CurrencyProduct).ratePerUnit} = 1 {(product as CurrencyProduct).unit.slice(0, -1)}
+                      </span>
                     </motion.div>
-                  ))}
+                    <motion.div
+                      className="flex items-center gap-2 p-3 rounded-lg glass border border-border/50"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 }}
+                    >
+                      <Check className={`w-4 h-4 ${accent} flex-shrink-0`} />
+                      <span className="text-sm text-foreground">Minimum: {(product as CurrencyProduct).minQuantity} {(product as CurrencyProduct).unit}</span>
+                    </motion.div>
+                    <motion.div
+                      className="flex items-center gap-2 p-3 rounded-lg glass border border-border/50"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <Check className={`w-4 h-4 ${accent} flex-shrink-0`} />
+                      <span className="text-sm text-foreground">Buy any amount you want!</span>
+                    </motion.div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Kit items (ranks only) */}
               {isRank && (
@@ -680,15 +804,60 @@ const Checkout = () => {
                             <div className={`text-xs ${keyQuantity === qty ? "text-white/80" : "text-muted-foreground"}`}>
                               {isDiscountActive ? (
                                 <span>
-                                  <span className="line-through mr-1">₹{basePrice * qty}</span>
-                                  <span className="text-green-400">₹{Math.round(basePrice * qty * 0.9)}</span>
+                                  <span className="line-through mr-1">₹{(product as KeyProduct).price * qty}</span>
+                                  <span className="text-green-400">₹{Math.round((product as KeyProduct).price * qty * 0.9)}</span>
                                 </span>
                               ) : (
-                                `₹${basePrice * qty}`
+                                `₹${(product as KeyProduct).price * qty}`
                               )}
                             </div>
                           </button>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Currency quantity input */}
+                  {isCurrency && (
+                    <div>
+                      <label className="block text-sm font-display text-muted-foreground mb-3">
+                        Enter Amount ({(product as CurrencyProduct).unit}):
+                      </label>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={(product as CurrencyProduct).minQuantity}
+                            value={currencyQuantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || (product as CurrencyProduct).minQuantity;
+                              setCurrencyQuantity(Math.max(val, (product as CurrencyProduct).minQuantity));
+                            }}
+                            className="bg-background/50 border-border/50 text-lg font-display text-center"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[100, 500, 1000, 2000].map((amount) => (
+                            <button
+                              key={amount}
+                              onClick={() => setCurrencyQuantity(amount)}
+                              className={`p-2 rounded-lg border-2 transition-all duration-300 text-sm font-display ${
+                                currencyQuantity === amount
+                                  ? `border-transparent bg-gradient-to-r ${gradient} text-white`
+                                  : "border-border/50 bg-card hover:border-primary/50 text-muted-foreground"
+                              }`}
+                            >
+                              {amount}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="p-3 rounded-lg glass border border-border/50 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Rate: ₹{(product as CurrencyProduct).ratePerUnit} = 1 {(product as CurrencyProduct).unit.slice(0, -1)}</p>
+                          <p className="text-sm font-display">
+                            <span className="text-muted-foreground">You get: </span>
+                            <span className={accent}>{currencyQuantity} {(product as CurrencyProduct).unit}</span>
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -710,7 +879,7 @@ const Checkout = () => {
                   {/* Price display */}
                   <div className="text-center py-4 border-y border-border/50">
                     <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                    {(product as KeyProduct).isFree ? (
+                    {isKey && (product as KeyProduct).isFree ? (
                       <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -744,6 +913,15 @@ const Checkout = () => {
                             className="inline-block px-2 py-1 bg-red-500/20 text-red-400 text-xs font-display font-bold rounded"
                           >
                             You save ₹{originalPrice - currentPrice}!
+                          </motion.div>
+                        )}
+                        {isCurrency && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-sm text-muted-foreground mt-2"
+                          >
+                            for {currencyQuantity} {(product as CurrencyProduct).unit}
                           </motion.div>
                         )}
                       </div>
