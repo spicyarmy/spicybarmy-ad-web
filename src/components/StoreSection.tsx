@@ -91,13 +91,13 @@ const StoreSection = () => {
           transition={{ duration: 0.6 }}
         >
           <span className="inline-block px-4 py-2 rounded-full glass text-sm font-display tracking-wider text-muted-foreground mb-4">
-            🔑 CRATE KEYS
+            🔑 SURVIVAL CRATE KEYS
           </span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-black mb-4">
-            <span className="gradient-text">Unlock Your Luck</span>
+            <span className="gradient-text">Survival Keys</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Use keys in-game to get random items according to your luck!
+            Use keys on the Survival server to get random items according to your luck!
           </p>
         </motion.div>
 

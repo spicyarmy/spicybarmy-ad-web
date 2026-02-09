@@ -21,6 +21,9 @@ const keyIdMap: Record<string, string> = {
   "Blood Key": "blood-key",
   "Blue Key (5x)": "blue-key",
   "Purple Key (5x)": "purple-key",
+  "Core Key": "core-key",
+  "Flux Key": "flux-key",
+  "Aura Key": "aura-key",
 };
 
 const KeyCard = ({

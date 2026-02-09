@@ -3,6 +3,7 @@ import ParticleBackground from "@/components/ParticleBackground";
 import HeroSection from "@/components/HeroSection";
 import RanksSection from "@/components/RanksSection";
 import StoreSection from "@/components/StoreSection";
+import LifestealStoreSection from "@/components/LifestealStoreSection";
 import CurrencySection from "@/components/CurrencySection";
 import VideoSection from "@/components/VideoSection";
 import FeaturesSection from "@/components/FeaturesSection";
@@ -31,8 +32,11 @@ const Index = () => {
       {/* Ranks Section */}
       <RanksSection />
       
-      {/* Store/Keys Section */}
+      {/* Survival Keys Section */}
       <StoreSection />
+      
+      {/* Lifesteal Keys Section */}
+      <LifestealStoreSection />
       
       {/* Currency Section - Coins & Claim Blocks */}
       <CurrencySection />
