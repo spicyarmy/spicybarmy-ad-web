@@ -244,6 +244,34 @@ const products: Record<string, Product> = {
     rewards: ["Notch Apple (64)", "Spawner x3 (20-30)", "Gold Coin", "Netherite Helmet", "Netherite Chestplate", "Netherite Leggings", "Netherite Boots", "Mace", "Netherite Sword", "Netherite Axe", "Netherite Pickaxe", "Netherite Hoe", "Netherite Shovel", "Feather", "Fishing Rod"],
     qrLink: "https://spicysmp.dpdns.org/purple_key.html",
   },
+  // Lifesteal Keys
+  "core-key": {
+    type: "key",
+    name: "Core Key",
+    description: "Essential Lifesteal gear with balanced enchantments and hearts.",
+    price: 10,
+    isFree: false,
+    rewards: ["Diamond Sword", "Diamond Armor Set", "Golden Apples x16", "Hearts x2", "Spawner"],
+    qrLink: "https://spicysmp.dpdns.org/core_key.html",
+  },
+  "flux-key": {
+    type: "key",
+    name: "Flux Key",
+    description: "Advanced Lifesteal kit with powerful enchantments and extra hearts.",
+    price: 20,
+    isFree: false,
+    rewards: ["Netherite Sword", "Netherite Armor Set", "Golden Apples x32", "Hearts x4", "Spawner x2", "Notch Apple"],
+    qrLink: "https://spicysmp.dpdns.org/flux_key.html",
+  },
+  "aura-key": {
+    type: "key",
+    name: "Aura Key",
+    description: "Ultimate Lifesteal crate with max enchantments, hearts and rare items.",
+    price: 30,
+    isFree: false,
+    rewards: ["Netherite Sword (Max Enchant)", "Netherite Armor Set (Max Enchant)", "Notch Apple x64", "Hearts x6", "Spawner x3", "Mace", "Gold Coin"],
+    qrLink: "https://spicysmp.dpdns.org/aura_key.html",
+  },
   // Currency products
   coins: {
     type: "currency",
@@ -331,6 +359,7 @@ const Checkout = () => {
   const [keyQuantity, setKeyQuantity] = useState(1);
   const [currencyQuantity, setCurrencyQuantity] = useState(100);
   const [showKitItems, setShowKitItems] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<"survival" | "lifesteal">("survival");
   
   // Form states
   const [minecraftUsername, setMinecraftUsername] = useState("");
@@ -354,6 +383,12 @@ const Checkout = () => {
   const isCurrency = product?.type === "currency";
   const isRank = product?.type === "rank";
   const isKey = product?.type === "key";
+  
+  // Spicy & Custom ranks are Survival only, lifesteal keys are Lifesteal only
+  const lifestealKeyIds = ["core-key", "flux-key", "aura-key"];
+  const isSurvivalOnly = (isRank && ((product as RankProduct).tier === "spicy" || (product as RankProduct).tier === "custom"));
+  const isLifestealOnly = productId ? lifestealKeyIds.includes(productId) : false;
+  const showServerSelector = !isSurvivalOnly && !isLifestealOnly && !isCurrency;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -491,6 +526,7 @@ const Checkout = () => {
         { name: "⏱️ Duration", value: duration, inline: true },
         { name: "🎯 Minecraft Username", value: minecraftUsername, inline: true },
         { name: "🔢 Transfer ID", value: transferId, inline: true },
+        { name: "🖥️ Server", value: isSurvivalOnly ? "Survival" : isLifestealOnly ? "Lifesteal" : selectedServer.charAt(0).toUpperCase() + selectedServer.slice(1), inline: true },
       ];
       
       // Add discount info
@@ -833,6 +869,44 @@ const Checkout = () => {
                 </div>
 
                 <div className="p-6 space-y-6">
+                  {/* Server selector */}
+                  {showServerSelector && (
+                    <div>
+                      <label className="block text-sm font-display text-muted-foreground mb-3">
+                        Choose Server:
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(["survival", "lifesteal"] as const).map((server) => (
+                          <button
+                            key={server}
+                            onClick={() => setSelectedServer(server)}
+                            className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                              selectedServer === server
+                                ? `border-transparent bg-gradient-to-r ${server === "survival" ? "from-green-500 to-emerald-600" : "from-red-500 to-rose-600"} text-white`
+                                : "border-border/50 bg-card hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="font-display font-bold capitalize">{server === "survival" ? "⛏️ Survival" : "❤️ Lifesteal"}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Survival only badge */}
+                  {isSurvivalOnly && (
+                    <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                      <span className="text-sm font-display text-green-400">⛏️ Survival Server Only</span>
+                    </div>
+                  )}
+
+                  {/* Lifesteal only badge */}
+                  {isLifestealOnly && (
+                    <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                      <span className="text-sm font-display text-red-400">❤️ Lifesteal Server Only</span>
+                    </div>
+                  )}
+
                   {/* Duration selector (ranks only) */}
                   {isRank && (
                     <div>
